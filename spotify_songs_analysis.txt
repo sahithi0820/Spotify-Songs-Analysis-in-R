@@ -1,0 +1,131 @@
+
+**DATASET LINK**
+
+ https://www.kaggle.com/code/lusfernandotorres/spotify-top-hits-2000-2019-eda/data
+
+
+**READING DATASET**
+
+> songs_normalize<-read.csv("songs_normalize.csv") 
+> View(songs_normalize) 
+> dim(songs_normalize) 
+> head(songs_normalize)  
+> colSums(is.na(songs_normalize))
+
+> spotify_songs<-unique(songs_normalize) 
+> dim(spotify_songs) 
+> View(spotify_songs)
+
+*ANALYSIS AND VISUALIZATIONS* 
+
+ > install.packages("ggplot2")
+ > install.packages("tidyverse")
+ > library(ggplot2) 
+ > library(tidyverse) 
+ > ggplot(spotify_songs, aes( x = popularity))+ geom_histogram(bins=15) + labs(title="popularity distribution by song") + theme_minimal()
+  
+
+**What is the proportion of high, medium, or low-rated songs? **
+
+ > summary(spotify_songs$popularity)
+ > spotify_songs$popularity
+ > spotify_songs$popularity_rating <- as.factor( ifelse(spotify_songs$popularity<=60, "Low - Under 60", ifelse(spotify_songs$popularity<=80, "Med - 60-79",ifelse(spotify_songs$popularity>80,'High - 80 above',"High - 80 above"))))
+ > spotify_songs$popularity_rating 
+  
+  #bar plot
+ > ggplot(spotify_songs, aes(x = popularity_rating))+geom_bar() +labs(title="Popularity of songs rated High, Med, Low") +theme_minimal()
+  
+  #piegraph
+> ggplot(spotify_songs,aes(x=factor(""),fill=popularity_rating))+geom_bar()+coord_polar(
+theta = "y") +scale_x_discrete("") + labs(title= "Proportion of songs rated High, Med, Low")
+
+*Top 15 Artists with the most releases of the songs from the year 1998 – 2020?*
+
+ > library(ggplot2)
+ > library(dplyr)
+ > Artist_Popular <- spotify_songs %>% count(artist, sort = TRUE, name = "Count") 
+ >  Artist_Fil <- Artist_Popular %>% filter(Count >= 15) 
+ > par(mar = c(12, 5, 4, 2)+ 0.1)
+ > ggplot(Artist_Fil, aes(x = reorder(artist, -Count), y = Count)) + geom_bar(stat = "identity", fill = "#80C4F5") +labs(x = "Artist", y = "Number of Songs") +theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+*HAS THE LENGTH OF SONGS CHANGED THROUGH THE YEARS?*
+
+  > song_duration<- transmute(spotify_songs, duration_min = (duration_ms / 1000)/60 , year)
+   
+  > ggplot(song_duration, aes(x=year, y=duration_min)) + labs(title = "Duration of songs over years from 2000-2020") + labs(x="Year") +labs(y= "Duration in minutes") +geom_smooth() +geom_point()
+
+
+
+
+***INTERACTIVE DASHBOARD WITH SHINY***
+
+ # Load necessary libraries
+> install.packages("shiny")
+> library(shiny)
+> library(ggplot2)
+> library(dplyr)
+
+# Ensure the spotify_songs dataframe has a 'year' column as integer
+> spotify_songs <- spotify_songs %>% mutate(year = as.integer(year))
+
+# Define UI
+> ui <- fluidPage(titlePanel("Spotify Songs Explorer"),sidebarLayout(sidebarPanel(selectInput("artist", "Select Artist:", choices = unique(spotify_songs$artist)), selectInput("feature", "Select Feature:", choices = c("danceability", "energy", "valence", "tempo", "popularity"))),mainPanel(plotOutput("featurePlot"))))
+
+# Define server logic
+> server <- function(input, output) {
++     output$featurePlot <- renderPlot({
++         filtered_data <- spotify_songs %>% 
++             filter(artist == input$artist)
++         
++         ggplot(filtered_data, aes_string(x = "year", y = input$feature)) + geom_line() + labs(title = paste(input$feature, "over time for", input$artist), x = "Year", y = input$feature)
++     })
++ }
+
+# Run the application 
+> shinyApp(ui = ui, server = server)
+
+
+
+***TIME SERIES ANALYSIS FOR POPULARITY OF DIFFERENT ARTISTS***
+#install libraries
+> install.packages("lubridate")
+
+ # Load necessary libraries
+> library(ggplot2)
+> library(dplyr)
+> library(lubridate)
+
+# Example time series analysis: Popularity over time
+> ggplot(spotify_songs, aes(x = year, y = popularity, color = artist)) + geom_smooth() + labs(title = "Popularity Over Time", x = "Year", y = "Popularity")
+
+
+***SHINY APP FOR FEATURE-BASED SONG RECOMMENDATIONS***
+
+ # Load necessary libraries
+> library(shiny)
+> library(dplyr)
+# Read dataset
+
+# Define UI
+> ui <- fluidPage(titlePanel("Spotify Songs Analysis"), sidebarLayout(sidebarPanel(selectInput("feature", "Select Feature:", choices = c("danceability", "energy", "valence", "tempo", "popularity"))),mainPanel(verbatimTextOutput("recommendations"))))
+
+# Define server logic
+> server <- function(input, output, session) {
+  output$recommendations <- renderPrint({
+    if (!is.null(input$feature) && input$feature != "") {
+      similar_songs <- recommend_songs(input$feature)
+      paste("Recommended Songs based on", input$feature, ":", paste(similar_songs, collapse = ", "))
+    } else {
+      "Select a feature to see recommendations."
+    }
+  })
+}
+
+# Function to recommend songs based on selected feature
+> recommend_songs <- function(feature) {top_songs <- spotify_songs %>%
+    arrange(desc(get(feature))) %>% head(5) %>% pull(song)
+  return(top_songs)
+}
+
+# Run the application 
+> shinyApp(ui = ui, server = server)
